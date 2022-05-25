@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=7777)
     parser.add_argument('--regularizer_term', type=float, default=0)
+    parser.add_argument('--regularizer_power', type=int, default=4)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--model', type=str, choices=['riemannian', 'landing', 'indirect'])
     args = parser.parse_args()
@@ -39,9 +40,9 @@ if __name__ == "__main__":
     model = getattr(model_module, 'Model')(args)
 
     if args.model == 'riemannian':
-        optimizer = RiemannianAdam(model.parameters(), args.lr)
+        optimizer = RiemannianSGD(model.parameters(), args.lr)
     else:
-        optimizer = Adam(model.parameters(), args.lr)
+        optimizer = SGD(model.parameters(), args.lr)
 
     model.train()
     for epoch in range(1, args.epoch + 1):

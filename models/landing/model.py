@@ -8,6 +8,7 @@ class Model(nn.Module):
 
         self.parameter_size = args.parameter_size
         self.regularizer_term = args.regularizer_term
+        self.regularizer_power = args.regularizer_power
 
         self.x: torch.Tensor = nn.parameter.Parameter(torch.zeros(self.parameter_size))
 
@@ -18,7 +19,7 @@ class Model(nn.Module):
     def forward(self, objective):
         difference = objective(self.x)
         regularizer = -self.x[0].pow(2) + self.x[1:].pow(2).sum() + 1
-        regularizer = regularizer.pow(2) / 2 / self.parameter_size
+        regularizer = regularizer.pow(self.regularizer_power) / 2 / self.parameter_size
         loss = difference + self.regularizer_term * regularizer
         print(regularizer.item())
         # print(self.x.max())
