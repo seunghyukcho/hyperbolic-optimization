@@ -5,25 +5,23 @@ from torch.nn import functional as F
 
 
 class Model(nn.Module):
-    def __init__(self, args) -> None:
+    def __init__(self, args, n_words) -> None:
         super().__init__()
 
-        self.parameter_size = args.parameter_size - 1
+        self.latent_dim = args.latent_dim
+        self.n_words = n_words
+        self.initial_sigma = args.initial_sigma
 
-        self.x = nn.parameter.Parameter(torch.zeros(self.parameter_size))
+        x_0 = torch.empty([self.n_words, self.latent_dim])
+        nn.init.normal_(x_0, std=self.initial_sigma)
+        self.embed = nn.Embedding.from_pretrained(x_0, freeze=False)
+
         self.manifold = geoopt.manifolds.Lorentz()
 
-    def get_x(self):
-        x = F.pad(self.x, (1, 0))
+    def forward(self, x):
+        x = self.embed(x)
+        x = F.pad(x, (1, 0))
         x = self.manifold.expmap0(x)
-        x = x.detach().cpu().numpy()
+
         return x
-
-    def forward(self, objective):
-        x = F.pad(self.x, (1, 0))
-        x = self.manifold.expmap0(x)
-        difference = objective(x)
-        loss = difference
-
-        return loss, difference
 
