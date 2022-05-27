@@ -6,10 +6,12 @@ class Model(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
 
-        self.x: torch.Tensor = nn.parameter.Parameter(torch.ones(args.parameter_size))
+        x_initial = torch.zeros(args.parameter_size)
+        x_initial[0] = 1
+        self.x: torch.Tensor = nn.parameter.Parameter(x_initial)
 
     def get_x(self):
-        x = self.x.detach().cpu().numpy()
+        x = self.x.detach().cpu().numpy().copy()
         return x
 
     def forward(self, objective):

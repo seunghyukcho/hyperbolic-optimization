@@ -19,10 +19,8 @@ class Model(nn.Module):
     def forward(self, objective):
         difference = objective(self.x)
         regularizer = -self.x[0].pow(2) + self.x[1:].pow(2).sum() + 1
-        regularizer = regularizer.pow(self.regularizer_power) / 2 / self.parameter_size
+        regularizer = regularizer.pow(self.regularizer_power) / 2
         loss = difference + self.regularizer_term * regularizer
-        print(regularizer.item())
-        # print(self.x.max())
 
         return loss, difference
 
