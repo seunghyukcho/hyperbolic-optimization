@@ -41,7 +41,11 @@ if __name__ == "__main__":
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     dataset = WordNet(args)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
+    loader = DataLoader(
+        dataset, 
+        batch_size=args.batch_size, 
+        shuffle=True
+    )
     
     model_module = importlib.import_module(f'models.{args.model}')
     model = getattr(model_module, 'Model')(args, dataset.n_words)
@@ -53,6 +57,7 @@ if __name__ == "__main__":
         optimizer = SGD(model.parameters(), args.lr)
 
     manifold = geoopt.manifolds.Lorentz()
+    # manifold = geoopt.manifolds.Euclidean(1)
     loss_fn = nn.CrossEntropyLoss()
 
     wandb.init(project='hyperbolic-optimization')
@@ -70,19 +75,15 @@ if __name__ == "__main__":
             embeds = model(x)
             
             dists = -manifold.dist(embeds[:, :1], embeds[:, 1:])
-            # s = dists[:, :1].exp() / dists.exp().sum(dim=-1)
-            # print(s.min(), s.max())
-            # print(dists[:, 0].min(), dists[:, 0].max())
             loss = loss_fn(
                 dists, 
                 torch.zeros(dists.size(0), device=x.device).long()
             )
             loss.backward()
-            grad_norm = nn.utils.clip_grad_norm_(model.parameters(), 50)
-            # print(grad_norm.item())
             optimizer.step()
             if args.model == 'projected':
-                model.project()
+                with torch.no_grad():
+                    model.project()
 
             total_loss += loss.item() * dists.size(0)
 
@@ -92,12 +93,54 @@ if __name__ == "__main__":
         })
 
         if epoch % args.eval_interval == 0 or epoch == args.n_epochs:
+            model.eval()
             with torch.no_grad():
-                model.eval()
                 rank, ap = calculate_metrics(dataset, model)
                 print(f"===========> Mean rank: {rank} | MAP: {ap}")
                 wandb.log({
                     'rank': rank,
                     'map': ap
                 })
+
+                # print(model(torch.LongTensor([[1]])))
+                # print(model.embed.data[1])
+
+                if args.latent_dim == 2:
+                    coors = torch.LongTensor(list(range(dataset.n_words))).cuda()
+                    coors = model(coors)
+                    coors = coors / (coors[:, :1] + 1)
+                    coors = coors[:, 1:].detach().cpu().numpy()
+                    fig = go.Figure()
+                    fig.add_trace(
+                        go.Scatter(
+                            mode='markers',
+                            x=coors[:, 0],
+                            y=coors[:, 1],
+                            showlegend=False
+                        )
+                    )
+
+                    # lines = torch.LongTensor(dataset.relations).cuda()
+                    # coors = model(lines)
+                    # coors = coors / (coors[..., :1] + 1)
+                    # coors = coors[..., 1:].detach().cpu().numpy()
+                    # for i in range(coors.shape[0]):
+                    #     fig.add_trace(
+                    #         go.Scatter(
+                    #             mode='lines',
+                    #             x=[coors[i, 0, 0], coors[i, 1, 0]],
+                    #             y=[coors[i, 0, 1], coors[i, 1, 1]],
+                    #             showlegend=False,
+                    #             line=dict(color='black')
+                    #         )
+                    #     )
+
+                    fig.update_yaxes(
+                        scaleanchor='x',
+                        scaleratio=1
+                    )
+                    wandb.log({
+                        'latents': fig
+                    })
+
 

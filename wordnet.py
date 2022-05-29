@@ -153,7 +153,7 @@ class WordNet(Dataset):
         anchor = self.relations[idx, 0]
         negatives = np.random.choice(
             list(self.graph[anchor]),
-            10,
+            100,
             replace=False
         )
         return np.r_[
@@ -188,11 +188,11 @@ def calculate_metrics(dataset, model):
     adjacency = create_adjacency(dataset.relations)
 
     iterator = tqdm(adjacency.items())
-    batch_size = dataset.n_words // 100
+    batch_size = dataset.n_words // 1
     for i, (source, targets) in enumerate(iterator):
         # if approx and i % 100 != 0:
-        if i % 1000 != 0:
-            continue
+        # if i % 1000 != 0:
+        #     continue
         input_ = np.c_[
             source * np.ones(dataset.n_words).astype(np.int64),
             np.arange(dataset.n_words)
