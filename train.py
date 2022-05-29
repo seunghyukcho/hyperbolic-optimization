@@ -50,7 +50,6 @@ if __name__ == "__main__":
     else:
         optimizer = SGD(model.parameters(), args.lr)
 
-
     wandb.init(project='hyperbolic-optimization')
     wandb.run.name = args.exp_name
     wandb.config.update(args)
