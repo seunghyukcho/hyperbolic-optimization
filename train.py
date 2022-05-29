@@ -58,6 +58,7 @@ if __name__ == "__main__":
     wandb.init(project='hyperbolic-optimization')
     wandb.run.name = args.exp_name
     wandb.config.update(args)
+    # wandb.watch(model, log_freq=10)
 
     for epoch in range(1, args.n_epochs + 1):
         total_loss = 0.
@@ -69,11 +70,16 @@ if __name__ == "__main__":
             embeds = model(x)
             
             dists = -manifold.dist(embeds[:, :1], embeds[:, 1:])
+            # s = dists[:, :1].exp() / dists.exp().sum(dim=-1)
+            # print(s.min(), s.max())
+            # print(dists[:, 0].min(), dists[:, 0].max())
             loss = loss_fn(
                 dists, 
                 torch.zeros(dists.size(0), device=x.device).long()
             )
             loss.backward()
+            grad_norm = nn.utils.clip_grad_norm_(model.parameters(), 50)
+            # print(grad_norm.item())
             optimizer.step()
             if args.model == 'projected':
                 model.project()

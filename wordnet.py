@@ -153,7 +153,7 @@ class WordNet(Dataset):
         anchor = self.relations[idx, 0]
         negatives = np.random.choice(
             list(self.graph[anchor]),
-            50,
+            10,
             replace=False
         )
         return np.r_[
