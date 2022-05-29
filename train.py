@@ -68,13 +68,15 @@ if __name__ == "__main__":
             x = x.cuda()
             embeds = model(x)
             
-            dists = manifold.dist(embeds[:, :1], embeds[:, 1:])
-            loss = loss_fn(dists, torch.zeros(dists.size(0), device=x.device).long())
+            dists = -manifold.dist(embeds[:, :1], embeds[:, 1:])
+            loss = loss_fn(
+                dists, 
+                torch.zeros(dists.size(0), device=x.device).long()
+            )
             loss.backward()
             optimizer.step()
             if args.model == 'projected':
                 model.project()
-                # print(model.embed.weight.data.size())
 
             total_loss += loss.item() * dists.size(0)
 

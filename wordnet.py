@@ -120,26 +120,46 @@ def slurp(file_name, parse_function=parse_tsv, symmetrize=False):
     return idx, objects
 
 
+def create_adjacency(indices):
+    adjacency = defaultdict(set)
+    for i in range(len(indices)):
+        s, o = indices[i]
+        adjacency[s].add(o)
+
+    return adjacency
+
+
 class WordNet(Dataset):
     def __init__(self, args) -> None:
         super().__init__()
 
         self.path = args.path
-        file_name = pathlib.Path(self.path).expanduser() / 'noun_closure.tsv'
+        file_name = pathlib.Path(self.path).expanduser() / 'mammal_closure.tsv'
         relations, words = slurp(file_name.as_posix(), symmetrize=False)
     
         self.relations = relations[:, :2]
         self.words = words
         self.n_relations = len(self.relations)
         self.n_words = len(self.words)
+        
+        self.graph = create_adjacency(self.relations)
+        for i in range(self.n_words):
+            self.graph[i] = set(range(self.n_words)) - self.graph[i]
 
     def __len__(self):
         return len(self.relations)
 
     def __getitem__(self, idx):
+        anchor = self.relations[idx, 0]
+        negatives = np.random.choice(
+            list(self.graph[anchor]),
+            50,
+            replace=False
+        )
         return np.r_[
             self.relations[idx],
-            np.random.randint(self.n_words, size=50)
+            negatives
+            # np.random.randint(self.n_words, size=50)
         ]
 
 
@@ -159,15 +179,6 @@ def calculate_energy(model, x, batch_size):
         kl_target[idx_start:idx_end] = dist
 
     return kl_target
-
-
-def create_adjacency(indices):
-    adjacency = defaultdict(set)
-    for i in range(len(indices)):
-        s, o = indices[i]
-        adjacency[s].add(o)
-
-    return adjacency
 
 
 def calculate_metrics(dataset, model):
