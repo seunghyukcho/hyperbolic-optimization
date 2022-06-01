@@ -14,7 +14,7 @@ class Model(nn.Module):
         self.x = geoopt.ManifoldParameter(data=initial_x, manifold=geoopt.manifolds.Lorentz()) 
 
     def get_x(self):
-        x = self.x.detach().cpu().numpy()
+        x = self.x.detach().cpu().numpy().copy()
         return x
 
     def forward(self, objective):

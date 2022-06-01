@@ -26,7 +26,7 @@ class Model(nn.Module):
         r = ((p + q) ** 2 - 1) / (2 * (p + q))
         s = ((p + q) ** 2 + 1) / (2 * (p + q))
 
-        if p + q >= 2:
+        if p + q >= 1:
             self.x.data[0] = s
             self.x.data[1:] = alpha * r
         else:

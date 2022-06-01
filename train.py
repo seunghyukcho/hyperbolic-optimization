@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument('--regularizer_power', type=int, default=4)
     parser.add_argument('--clip_grad', type=float, default=1e9)
     parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--norm', type=float, default=1)
     parser.add_argument('--model', type=str, 
         choices=['riemannian', 'landing', 'indirect', 'projected']
     )
@@ -34,12 +35,20 @@ if __name__ == "__main__":
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     manifold = geoopt.manifolds.Lorentz()
-    ground_truth = torch.randn(args.parameter_size)
+    # ground_truth = torch.randn(args.parameter_size)
+    if args.seed == 1:
+        ground_truth = torch.tensor([1.])
+    else:
+        ground_truth = torch.tensor([-1.])
+    norm = ground_truth.pow(2).sum().sqrt()
+    ground_truth = ground_truth / norm * args.norm
     ground_truth = F.pad(ground_truth, (1, 0))
     ground_truth = manifold.expmap0(ground_truth)
 
     def objective(x):
-        return (x - ground_truth).pow(2).mean()
+        m = geoopt.Lorentz()
+        return m.dist(x, ground_truth)
+        # return (x - ground_truth).pow(2).mean()
 
     model_module = importlib.import_module(f'models.{args.model}')
     args.parameter_size += 1
@@ -53,13 +62,18 @@ if __name__ == "__main__":
     wandb.init(project='hyperbolic-optimization')
     wandb.run.name = args.exp_name
     wandb.config.update(args)
-    wandb.watch(model, log_freq=1, log_graph=True)
+    # wandb.watch(model, log_freq=1, log_graph=True)
 
     trajectory = []
     model.train()
+    steps = 1e9
     for epoch in range(1, args.epoch + 1):
         optimizer.zero_grad()
         loss, difference = model(objective)
+        if difference < 1e-5:
+            steps = min(steps, epoch)
+        if loss.isnan():
+            exit()
         loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             model.parameters(), 
@@ -78,6 +92,11 @@ if __name__ == "__main__":
         })
 
         print(f"Epoch {epoch:3d} | Loss: {loss.item():.5f} | Difference: {difference.item():.5f} | Grad: {grad_norm.item()}")
+
+    print(f"==========> Converged at {steps} epoch")
+    wandb.log({
+        'converged': steps
+    })
    
     if args.parameter_size == 2:
         trajectory = np.stack(trajectory)
