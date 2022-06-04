@@ -4,6 +4,7 @@ import geoopt
 import argparse
 import importlib
 import numpy as np
+from torch import nn
 from plotly import graph_objects as go
 from torch.optim import SGD
 from torch.nn import functional as F
@@ -12,13 +13,49 @@ from geoopt.optim import RiemannianSGD
 from models import *
 
 
+class ACosH(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        if x < 1:
+            return x * 0
+        else:
+            return x.arccosh()
+    
+    @staticmethod
+    def backward(ctx, grad_out):
+        x, = ctx.saved_tensors
+        if x <= 1:
+            return grad_out * 0
+        else:
+            return grad_out * 1 / ((x.pow(2) - 1).sqrt())
+
+
+class LN(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        if x >= 1:
+            return x.log()
+        else:
+            return x * 0
+    
+    @staticmethod
+    def backward(ctx, grad_out):
+        x, = ctx.saved_tensors
+        if x <= 1.:
+            return grad_out * 0
+        else:
+            return grad_out * 1 / x
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('--parameter_size', type=int, default=10)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=7777)
     parser.add_argument('--regularizer_term', type=float, default=0)
-    parser.add_argument('--regularizer_power', type=int, default=4)
+    parser.add_argument('--regularizer_power', type=float, default=1)
     parser.add_argument('--clip_grad', type=float, default=1e9)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--norm', type=float, default=1)
@@ -46,9 +83,10 @@ if __name__ == "__main__":
     ground_truth = manifold.expmap0(ground_truth)
 
     def objective(x):
-        m = geoopt.Lorentz()
-        return m.dist(x, ground_truth)
-        # return (x - ground_truth).pow(2).mean()
+        inner = -x[0] * ground_truth[0] + (x[1:] * ground_truth[1:]).sum()
+        loss = LN.apply(-inner).pow(2)
+        # loss = ACosH.apply(-inner).pow(2)
+        return loss
 
     model_module = importlib.import_module(f'models.{args.model}')
     args.parameter_size += 1
@@ -62,7 +100,6 @@ if __name__ == "__main__":
     wandb.init(project='hyperbolic-optimization')
     wandb.run.name = args.exp_name
     wandb.config.update(args)
-    # wandb.watch(model, log_freq=1, log_graph=True)
 
     trajectory = []
     model.train()
@@ -70,10 +107,8 @@ if __name__ == "__main__":
     for epoch in range(1, args.epoch + 1):
         optimizer.zero_grad()
         loss, difference = model(objective)
-        if difference < 1e-5:
-            steps = min(steps, epoch)
         if loss.isnan():
-            exit()
+            break
         loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             model.parameters(), 
@@ -84,11 +119,15 @@ if __name__ == "__main__":
         if args.model == 'projected':
             model.project()
         trajectory.append(model.get_x())
+        difference = (model.x - ground_truth).pow(2).mean()
+        if difference < 1e-5:
+            steps = min(steps, epoch)
 
         wandb.log({
             'loss': loss.item(),
             'difference': difference.item(),
-            'grad_norm': grad_norm.item()
+            'grad_norm': grad_norm.item(),
+            'epoch': epoch
         })
 
         print(f"Epoch {epoch:3d} | Loss: {loss.item():.5f} | Difference: {difference.item():.5f} | Grad: {grad_norm.item()}")

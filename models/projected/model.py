@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from math import sqrt
 
 
 class Model(nn.Module):
@@ -18,17 +19,19 @@ class Model(nn.Module):
         difference = objective(self.x)
         loss = difference
         return loss, difference
-
+    
     def project(self):
         p = torch.linalg.norm(self.x[1:])
         q = self.x[0]
-        alpha = self.x[1:] / p
-        r = ((p + q) ** 2 - 1) / (2 * (p + q))
-        s = ((p + q) ** 2 + 1) / (2 * (p + q))
-
-        if p + q >= 1:
-            self.x.data[0] = s
-            self.x.data[1:] = alpha * r
+        alpha = self.x[1:]/p
+        if (p+q)>=1:
+            r = ((p+q)**2 - 1) / (2*(p+q))
+            s = ((p+q)**2 + 1) / (2*(p+q))
         else:
-            self.x.data[0] = (p ** 2 + 1).sqrt()
+            # r = (sqrt(p**2*(3*p**2+q**2-4*q+4))+2*p*q-4*p)/(p ** 2-q ** 2+4*q-4+1e-8)
+            r = p
+            s = sqrt(1 + r ** 2)
+
+        self.x.data[0] = s
+        self.x.data[1:] = alpha * r
 
