@@ -4,7 +4,6 @@ import geoopt
 import argparse
 import importlib
 import numpy as np
-from torch import nn
 from plotly import graph_objects as go
 from torch.optim import SGD
 from torch.nn import functional as F
@@ -17,7 +16,7 @@ class ACosH(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x):
         ctx.save_for_backward(x)
-        if x < 1:
+        if x <= 1:
             return x * 0
         else:
             return x.arccosh()
@@ -31,31 +30,12 @@ class ACosH(torch.autograd.Function):
             return grad_out * 1 / ((x.pow(2) - 1).sqrt())
 
 
-class LN(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x):
-        ctx.save_for_backward(x)
-        if x >= 1:
-            return x.log()
-        else:
-            return x * 0
-    
-    @staticmethod
-    def backward(ctx, grad_out):
-        x, = ctx.saved_tensors
-        if x <= 1.:
-            return grad_out * 0
-        else:
-            return grad_out * 1 / x
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('--parameter_size', type=int, default=10)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=7777)
     parser.add_argument('--regularizer_term', type=float, default=0)
-    parser.add_argument('--regularizer_power', type=float, default=1)
     parser.add_argument('--clip_grad', type=float, default=1e9)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--norm', type=float, default=1)
@@ -72,24 +52,21 @@ if __name__ == "__main__":
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     manifold = geoopt.manifolds.Lorentz()
-    # ground_truth = torch.randn(args.parameter_size)
-    if args.seed == 1:
-        ground_truth = torch.tensor([1.])
-    else:
-        ground_truth = torch.tensor([-1.])
+
+    ground_truth = torch.randn(args.parameter_size)
     norm = ground_truth.pow(2).sum().sqrt()
     ground_truth = ground_truth / norm * args.norm
     ground_truth = F.pad(ground_truth, (1, 0))
     ground_truth = manifold.expmap0(ground_truth)
 
     def objective(x):
+        # loss = manifold.dist(x, ground_truth).pow(2)
         inner = -x[0] * ground_truth[0] + (x[1:] * ground_truth[1:]).sum()
-        loss = LN.apply(-inner).pow(2)
-        # loss = ACosH.apply(-inner).pow(2)
+        # loss = LN.apply(-inner).pow(2)
+        loss = ACosH.apply(-inner).pow(2)
         return loss
 
     model_module = importlib.import_module(f'models.{args.model}')
-    args.parameter_size += 1
     model = getattr(model_module, 'Model')(args)
 
     if args.model == 'riemannian':

@@ -7,7 +7,7 @@ class Model(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
 
-        self.parameter_size = args.parameter_size
+        self.parameter_size = args.parameter_size + 1
 
         initial_x = torch.zeros(self.parameter_size)
         initial_x[..., 0] = 1
