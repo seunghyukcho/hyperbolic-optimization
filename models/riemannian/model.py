@@ -1,25 +1,27 @@
 import torch
 import geoopt
 from torch import nn
+from torch.nn import functional as F
 
 
 class Model(nn.Module):
-    def __init__(self, args) -> None:
+    def __init__(self, args, n_words) -> None:
         super().__init__()
 
-        self.parameter_size = args.parameter_size
+        self.latent_dim = args.latent_dim
+        self.n_words = n_words
+        self.initial_sigma = args.initial_sigma
 
-        initial_x = torch.zeros(self.parameter_size)
-        initial_x[..., 0] = 1
-        self.x = geoopt.ManifoldParameter(data=initial_x, manifold=geoopt.manifolds.Lorentz()) 
+        manifold = geoopt.manifolds.Lorentz()
 
-    def get_x(self):
-        x = self.x.detach().cpu().numpy()
+        x_0 = torch.empty([self.n_words, self.latent_dim])
+        nn.init.normal_(x_0, std=self.initial_sigma)
+        x_0 = F.pad(x_0, (1, 0))
+        x_0 = manifold.expmap0(x_0)
+
+        self.embed = geoopt.ManifoldParameter(data=x_0, manifold=geoopt.manifolds.Lorentz()) 
+
+    def forward(self, x):
+        x = self.embed[x]
         return x
-
-    def forward(self, objective):
-        difference = objective(self.x)
-        loss = difference
-
-        return loss, difference
 

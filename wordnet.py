@@ -175,7 +175,9 @@ def calculate_energy(model, x, batch_size):
         data = x[idx_start:idx_end]
 
         embeds = model(data)
-        dist = manifold.dist(embeds[:, 0], embeds[:, 1])
+        if len(embeds) == 2:
+            embeds = embeds[0]
+        dist = manifold.dist(embeds[:, 0], embeds[:, 1]).pow(2)
         kl_target[idx_start:idx_end] = dist
 
     return kl_target

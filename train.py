@@ -24,7 +24,6 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=5000)
     parser.add_argument('--seed', type=int, default=7777)
     parser.add_argument('--regularizer_term', type=float, default=0)
-    parser.add_argument('--regularizer_power', type=int, default=4)
     parser.add_argument('--clip_grad', type=float, default=1e9)
     parser.add_argument('--initial_sigma', type=float, default=0.01)
     parser.add_argument('--lr', type=float, default=0.01)
@@ -72,13 +71,18 @@ if __name__ == "__main__":
             for param in model.parameters():
                 param.grad = None
             x = x.cuda()
-            embeds = model(x)
+            if args.model == 'landing':
+                embeds, regularizer = model(x)
+            else:
+                embeds = model(x)
+                regularizer = 0
             
-            dists = -manifold.dist(embeds[:, :1], embeds[:, 1:])
+            dists = manifold.dist(embeds[:, :1], embeds[:, 1:]).pow(2)
             loss = loss_fn(
-                dists, 
+                -dists, 
                 torch.zeros(dists.size(0), device=x.device).long()
             )
+            loss = loss + regularizer
             loss.backward()
             optimizer.step()
             if args.model == 'projected':
@@ -102,12 +106,12 @@ if __name__ == "__main__":
                     'map': ap
                 })
 
-                # print(model(torch.LongTensor([[1]])))
-                # print(model.embed.data[1])
-
                 if args.latent_dim == 2:
                     coors = torch.LongTensor(list(range(dataset.n_words))).cuda()
-                    coors = model(coors)
+                    if args.model == 'landing':
+                        coors, _ = model(coors)
+                    else:
+                        coors = model(coors)
                     coors = coors / (coors[:, :1] + 1)
                     coors = coors[:, 1:].detach().cpu().numpy()
                     fig = go.Figure()
@@ -120,20 +124,24 @@ if __name__ == "__main__":
                         )
                     )
 
-                    # lines = torch.LongTensor(dataset.relations).cuda()
-                    # coors = model(lines)
-                    # coors = coors / (coors[..., :1] + 1)
-                    # coors = coors[..., 1:].detach().cpu().numpy()
-                    # for i in range(coors.shape[0]):
-                    #     fig.add_trace(
-                    #         go.Scatter(
-                    #             mode='lines',
-                    #             x=[coors[i, 0, 0], coors[i, 1, 0]],
-                    #             y=[coors[i, 0, 1], coors[i, 1, 1]],
-                    #             showlegend=False,
-                    #             line=dict(color='black')
-                    #         )
-                    #     )
+                    lines = torch.LongTensor(dataset.relations).cuda()
+                    if args.model == 'landing':
+                        coors, _ = model(lines)
+                    else:
+                        coors = model(lines)
+                    coors = coors[:500]
+                    coors = coors / (coors[..., :1] + 1)
+                    coors = coors[..., 1:].detach().cpu().numpy()
+                    for i in range(coors.shape[0]):
+                        fig.add_trace(
+                            go.Scatter(
+                                mode='lines',
+                                x=[coors[i, 0, 0], coors[i, 1, 0]],
+                                y=[coors[i, 0, 1], coors[i, 1, 1]],
+                                showlegend=False,
+                                line=dict(color='black')
+                            )
+                        )
 
                     fig.update_yaxes(
                         scaleanchor='x',
