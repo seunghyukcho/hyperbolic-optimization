@@ -11,7 +11,10 @@ class Model(nn.Module):
 
         initial_x = torch.zeros(self.parameter_size)
         initial_x[..., 0] = 1
-        self.x = geoopt.ManifoldParameter(data=initial_x, manifold=geoopt.manifolds.Lorentz()) 
+        self.x = geoopt.ManifoldParameter(
+            data=initial_x, 
+            manifold=geoopt.manifolds.Lorentz()
+        )
 
     def get_x(self):
         x = self.x.detach().cpu().numpy().copy()

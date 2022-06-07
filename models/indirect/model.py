@@ -8,15 +8,17 @@ class Model(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
 
-        self.parameter_size = args.parameter_size - 1
+        self.parameter_size = args.parameter_size
 
-        self.x = nn.parameter.Parameter(torch.zeros(self.parameter_size))
+        self.x = nn.parameter.Parameter(
+            torch.zeros(self.parameter_size)
+        )
         self.manifold = geoopt.manifolds.Lorentz()
 
     def get_x(self):
         x = F.pad(self.x, (1, 0))
         x = self.manifold.expmap0(x)
-        x = x.detach().cpu().numpy()
+        x = x.detach().cpu().numpy().copy()
         return x
 
     def forward(self, objective):

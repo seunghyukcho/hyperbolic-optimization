@@ -26,6 +26,5 @@ class Model(nn.Module):
         regularizer = regularizer.pow(2) / 2
         
         loss = difference + self.regularizer_term * regularizer
-
         return loss, difference
 
