@@ -163,12 +163,11 @@ class WordNet(Dataset):
         ]
 
 
-def calculate_energy(model, x, batch_size):
+def calculate_energy(model, x, batch_size, dist):
     x = torch.tensor(x).cuda()
     kl_target = torch.zeros(x.size(0)).cuda()
     nb_batch = np.ceil(x.size(0) / batch_size).astype(int)
 
-    manifold = geoopt.manifolds.Lorentz()
     for i in range(nb_batch):
         idx_start = i * batch_size
         idx_end = (i + 1) * batch_size
@@ -177,13 +176,13 @@ def calculate_energy(model, x, batch_size):
         embeds = model(data)
         if len(embeds) == 2:
             embeds = embeds[0]
-        dist = manifold.dist(embeds[:, 0], embeds[:, 1])
+        dist = dist(embeds[:, 0], embeds[:, 1])
         kl_target[idx_start:idx_end] = dist
 
     return kl_target
 
 
-def calculate_metrics(dataset, model):
+def calculate_metrics(dataset, model, dist):
     ranks = []
     ap_scores = []
 
@@ -203,6 +202,7 @@ def calculate_metrics(dataset, model):
             model,
             input_, 
             batch_size,
+            dist
         ).detach().cpu().numpy()
         
         _energies[source] = 1e+12
