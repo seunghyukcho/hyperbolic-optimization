@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=7777)
     parser.add_argument('--regularizer_term', type=float, default=0)
     parser.add_argument('--clip_grad', type=float, default=1e9)
-    parser.add_argument('--initial_sigma', type=float, default=0.01)
+    parser.add_argument('--initial_sigma', type=float, default=0.001)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--model', type=str, 
         choices=['riemannian', 'landing', 'indirect', 'projected']
@@ -56,7 +56,6 @@ if __name__ == "__main__":
         optimizer = SGD(model.parameters(), args.lr)
 
     manifold = geoopt.manifolds.Lorentz()
-    # manifold = geoopt.manifolds.Euclidean(1)
     loss_fn = nn.CrossEntropyLoss()
 
     wandb.init(project='hyperbolic-optimization')
@@ -77,7 +76,7 @@ if __name__ == "__main__":
                 embeds = model(x)
                 regularizer = 0
             
-            dists = manifold.dist(embeds[:, :1], embeds[:, 1:]).pow(2)
+            dists = manifold.dist(embeds[:, :1], embeds[:, 1:])
             loss = loss_fn(
                 -dists, 
                 torch.zeros(dists.size(0), device=x.device).long()
